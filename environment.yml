@@ -1,0 +1,14 @@
+name: myenv
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.12
+  - pytorch=2.4.0
+  - torchvision=0.19
+  - pytorch-cuda=11.8
+  - seaborn=0.13.2
+  - gdown=5.2.0
+  - tqdm=4.66.4
