@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 from torch import nn
+from torch.nn.utils.parametrizations import spectral_norm
 
 
 class BaseNetwork(nn.Module, ABC):
@@ -60,6 +61,7 @@ class Discriminator(BaseNetwork):
 
 class Generator(BaseNetwork):
     def __init__(self, noise_size, input_size, features_size):
+        print(noise_size)
         self.n_size = noise_size
         super().__init__(input_size, features_size)
 
@@ -87,4 +89,37 @@ class Generator(BaseNetwork):
                 self.f_size, self.in_size, kernel_size=4, stride=2, padding=1
             ),
             nn.Tanh(),
+        )
+
+
+class SpectralDiscriminator(BaseNetwork):
+    def _block(self, in_channels, out_channels, kernel_size, stride, padding):
+        return nn.Sequential(
+            spectral_norm(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size,
+                    stride,
+                    padding,
+                    bias=False,
+                )
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+
+    def _build_network(self):
+        return nn.Sequential(
+            spectral_norm(
+                nn.Conv2d(self.in_size, self.f_size, kernel_size=4, stride=2, padding=1)
+            ),
+            nn.LeakyReLU(0.2, inplace=True),
+            self._block(self.f_size, self.f_size * 2, 4, 2, 1),
+            self._block(self.f_size * 2, self.f_size * 4, 4, 2, 1),
+            self._block(self.f_size * 4, self.f_size * 8, 4, 2, 1),
+            spectral_norm(
+                nn.Conv2d(self.f_size * 8, 1, kernel_size=4, stride=2, padding=0)
+            ),
+            nn.Sigmoid(),
         )

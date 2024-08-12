@@ -1,10 +1,13 @@
 import torch
 from tqdm import tqdm
 
+from models import Discriminator, Generator, SpectralDiscriminator
+
+REAL_LABEL = 1
+FAKE_LABEL = 0
+
 
 class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
     def __init__(self):
         self.reset()
 
@@ -21,45 +24,83 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
+def save_checkpoint(state, path):
+    torch.save(state, path)
+
+
+def get_network(net, nc, nf, nz, device):
+    match net:
+        case "dcgan":
+            net_d = Discriminator(nc, nf)
+            net_g = Generator(nz, nc, nf)
+        case "spectral_dcgan":
+            net_d = SpectralDiscriminator(nc, nf)
+            net_g = Generator(nz, nc, nf)
+        case _:
+            raise NotImplementedError(
+                f"Network of name '{net}' currently is not implemented"
+            )
+
+    net_d = net_d.to(device)
+    net_g = net_g.to(device)
+    return net_d, net_g
+
+
 def epoch(
-    loader, net_d, net_g, device, criterion, opt_d, opt_g, r_label, f_label, bs, nz
+    loader,
+    net_d,
+    net_g,
+    device,
+    criterion,
+    opt_d,
+    opt_g,
+    nz,
 ):
     losses_d = AverageMeter()
     losses_g = AverageMeter()
-    real_probs = AverageMeter()
-    fake_probs = AverageMeter()
+    d_x_meter = AverageMeter()
+    d_g_z1_meter = AverageMeter()
+    d_g_z2_meter = AverageMeter()
 
     for real_imgs, _ in tqdm(loader, leave=False):
+        b_size = real_imgs.size(0)
         net_d.zero_grad(set_to_none=True)
         real_imgs = real_imgs.to(device)
-        labels = torch.full((bs,), r_label, dtype=torch.float, device=device)
+        labels = torch.full((b_size,), REAL_LABEL, dtype=torch.float, device=device)
         outputs = net_d(real_imgs).view(-1)
         loss_d_real = criterion(outputs, labels)
         loss_d_real.backward()
-        d_x = outputs.mean().item()
+        d_x = outputs.mean()
 
-        noise = torch.randn(bs, nz, 1, 1, device=device)
+        noise = torch.randn(b_size, nz, 1, 1, device=device)
         fake_imgs = net_g(noise)
-        labels.fill_(f_label)
+        labels.fill_(FAKE_LABEL)
 
         outputs = net_d(fake_imgs.detach()).view(-1)
         loss_d_fake = criterion(outputs, labels)
         loss_d_fake.backward()
-        d_g_z1 = outputs.mean().item()
+        d_g_z1 = outputs.mean()
         loss_d = loss_d_real + loss_d_fake
         opt_d.step()
 
         net_g.zero_grad(set_to_none=True)
-        labels.fill_(r_label)
+        labels.fill_(REAL_LABEL)
         outputs = net_d(fake_imgs).view(-1)
         loss_g = criterion(outputs, labels)
         loss_g.backward()
-        d_g_z2 = outputs.mean().item()
+        d_g_z2 = outputs.mean()
         opt_g.step()
 
-        losses_d.update(loss_d.item(), bs)
-        losses_g.update(loss_g.item(), bs)
-        real_probs.update(d_x, bs)
-        fake_probs.update(d_g_z1 / d_g_z2, bs)
+        losses_d.update(loss_d.item(), b_size)
+        losses_g.update(loss_g.item(), b_size)
+        d_x_meter.update(d_x.item(), b_size)
+        d_g_z1_meter.update(d_g_z1.item(), b_size)
+        d_g_z2_meter.update(d_g_z2.item(), b_size)
 
-    return losses_d.avg, losses_g.avg, real_probs.avg, fake_probs.avg
+    return (
+        losses_d.avg,
+        losses_g.avg,
+        d_x_meter.avg,
+        d_g_z1_meter.avg,
+        d_g_z2_meter.avg,
+    )
