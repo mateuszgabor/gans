@@ -1,7 +1,13 @@
 import torch
 from tqdm import tqdm
 
-from models import Discriminator, Generator, SpectralDiscriminator
+from models import (
+    Discriminator,
+    Generator,
+    SaDiscriminator,
+    SaGenerator,
+    SpectralDiscriminator,
+)
 
 REAL_LABEL = 1
 FAKE_LABEL = 0
@@ -24,8 +30,29 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def save_checkpoint(state, path):
-    torch.save(state, path)
+class TrainingLogger:
+    def __init__(self):
+        self.details = {
+            "epoch": [],
+            "d_losses": [],
+            "g_losses": [],
+            "d_x": [],
+            "d_g_z1": [],
+            "d_g_z2": [],
+            "times": [],
+        }
+
+    def log_epoch(self, epoch_num, d_loss, g_loss, d_x, d_g_z1, d_g_z2, time):
+        self.details["epoch"].append(epoch_num)
+        self.details["d_losses"].append(d_loss)
+        self.details["g_losses"].append(g_loss)
+        self.details["d_x"].append(d_x)
+        self.details["d_g_z1"].append(d_g_z1)
+        self.details["d_g_z2"].append(d_g_z2)
+        self.details["times"].append(time)
+
+    def save(self, filepath):
+        torch.save(self.details, filepath)
 
 
 def get_network(net, nc, nf, nz, device):
@@ -36,6 +63,9 @@ def get_network(net, nc, nf, nz, device):
         case "spectral_dcgan":
             net_d = SpectralDiscriminator(nc, nf)
             net_g = Generator(nz, nc, nf)
+        case "sagan":
+            net_d = SaDiscriminator(nc, nf)
+            net_g = SaGenerator(nz, nc, nf)
         case _:
             raise NotImplementedError(
                 f"Network of name '{net}' currently is not implemented"

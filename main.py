@@ -1,5 +1,5 @@
 import argparse
-import json
+import time
 from pathlib import Path
 
 import torch
@@ -10,7 +10,7 @@ from torchvision import transforms
 from torchvision.datasets import CelebA
 from torchvision.utils import save_image
 
-from utils import epoch, get_network, save_checkpoint
+from utils import TrainingLogger, epoch, get_network
 
 IMG_SIZE = 64
 NORMALIZE = (0.5, 0.5, 0.5)
@@ -43,12 +43,15 @@ def main():
     workers = args.workers
 
     p = Path(__file__)
-    checkpoint_path = f"{p.parent}/checkpoints"
-    generated_path = f"{p.parent}/generated/{net_name}"
-    Path(checkpoint_path).mkdir(parents=True, exist_ok=True)
-    Path(generated_path).mkdir(parents=True, exist_ok=True)
+    checkpoint_path = Path(f"{p.parent}/checkpoints/{net_name}")
+    generated_path = Path(f"{p.parent}/generated/{net_name}")
+    train_details_path = Path(f"{p.parent}/train_details")
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    generated_path.mkdir(parents=True, exist_ok=True)
+    train_details_path.mkdir(parents=True, exist_ok=True)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(device)
 
     transform = transforms.Compose(
         [
@@ -77,9 +80,10 @@ def main():
     criterion = nn.BCELoss()
     fixed_noise = torch.randn(64, nz, 1, 1, device=device)
 
-    d_losses = []
-    g_losses = []
+    logger = TrainingLogger()
+
     for i in range(1, num_epochs + 1):
+        start_time = time.time()
         d_loss, g_loss, d_x, d_g_z1, d_g_z2 = epoch(
             train_loader,
             net_d,
@@ -90,33 +94,32 @@ def main():
             opt_g,
             nz,
         )
+        epoch_time = time.time() - start_time
+
         print(
             f"Epoch: {i} | D loss: {d_loss:.4f}, G loss: {g_loss:.4f} | "
-            + f"D(x): {d_x:.4f}, D(G(z)): {d_g_z1:.4f} / {d_g_z2:.4f}"
+            + f"D(x): {d_x:.4f}, D(G(z1)): {d_g_z1:.4f}. D(G(z2)): {d_g_z2:.4f} | Time:  {epoch_time:.2f} s"
         )
-        d_losses.append(d_loss)
-        g_losses.append(g_loss)
+
+        logger.log_epoch(i, d_loss, g_loss, d_x, d_g_z1, d_g_z2, epoch_time)
+        logger.save(f"{train_details_path}/{net_name}.pth")
 
         with torch.no_grad():
             fake = net_g(fixed_noise)
             save_image(fake, f"{generated_path}/{i}.png", normalize=True)
 
-    with open(f"{checkpoint_path}/{net_name}_d_losses.json", "w") as f:
-        json.dump(d_losses, f)
+        torch.save(
+            {
+                "epoch": i,
+                "net_d": net_d.state_dict(),
+                "net_g": net_g.state_dict(),
+                "opt_d": opt_d.state_dict(),
+                "opt_g": opt_g.state_dict(),
+            },
+            f"{checkpoint_path}/{net_name}_{i}.pth.tar",
+        )
 
-    with open(f"{checkpoint_path}/{net_name}_g_losses.json", "w") as f:
-        json.dump(g_losses, f)
-
-    save_checkpoint(
-        {
-            "epoch": i,
-            "net_d": net_d.state_dict(),
-            "net_g": net_g.state_dict(),
-            "opt_d": opt_d.state_dict(),
-            "opt_g": opt_g.state_dict(),
-        },
-        f"{checkpoint_path}/{net_name}.pth.tar",
-    )
+    print("Finish training!")
 
 
 if __name__ == "__main__":
