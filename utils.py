@@ -4,9 +4,11 @@ from tqdm import tqdm
 from models import (
     Discriminator,
     Generator,
+    Generatorv2,
     SaDiscriminator,
     SaGenerator,
     SpectralDiscriminator,
+    SpectralDiscriminatorv2,
 )
 
 REAL_LABEL = 1
@@ -63,6 +65,9 @@ def get_network(net, nc, nf, nz, device):
         case "spectral_dcgan":
             net_d = SpectralDiscriminator(nc, nf)
             net_g = Generator(nz, nc, nf)
+        case "spectral_dcgan_v2":
+            net_d = SpectralDiscriminatorv2(nc, nf)
+            net_g = Generatorv2(nz, nc, nf)
         case "sagan":
             net_d = SaDiscriminator(nc, nf)
             net_g = SaGenerator(nz, nc, nf)

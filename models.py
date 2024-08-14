@@ -92,6 +92,22 @@ class Generator(BaseNetwork):
         )
 
 
+class Generatorv2(Generator):
+    def _block(self, in_channels, out_channels, kernel_size, stride, padding):
+        return nn.Sequential(
+            nn.ConvTranspose2d(
+                in_channels,
+                out_channels,
+                kernel_size,
+                stride,
+                padding,
+                bias=False,
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.GELU(),
+        )
+
+
 class SpectralDiscriminator(BaseNetwork):
     def _block(self, in_channels, out_channels, kernel_size, stride, padding):
         return nn.Sequential(
@@ -118,6 +134,27 @@ class SpectralDiscriminator(BaseNetwork):
             self._block(self.f_size, self.f_size * 2, 4, 2, 1),
             self._block(self.f_size * 2, self.f_size * 4, 4, 2, 1),
             self._block(self.f_size * 4, self.f_size * 8, 4, 2, 1),
+            spectral_norm(
+                nn.Conv2d(self.f_size * 8, 1, kernel_size=4, stride=2, padding=0)
+            ),
+            nn.Sigmoid(),
+        )
+
+
+class SpectralDiscriminatorv2(SpectralDiscriminator):
+    def _build_network(self):
+        return nn.Sequential(
+            spectral_norm(
+                nn.Conv2d(self.in_size, self.f_size, kernel_size=4, stride=2, padding=1)
+            ),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.3),
+            self._block(self.f_size, self.f_size * 2, 4, 2, 1),
+            nn.Dropout(0.3),
+            self._block(self.f_size * 2, self.f_size * 4, 4, 2, 1),
+            nn.Dropout(0.3),
+            self._block(self.f_size * 4, self.f_size * 8, 4, 2, 1),
+            nn.Dropout(0.3),
             spectral_norm(
                 nn.Conv2d(self.f_size * 8, 1, kernel_size=4, stride=2, padding=0)
             ),
@@ -189,10 +226,14 @@ class SaDiscriminator(SpectralDiscriminator):
                 nn.Conv2d(self.in_size, self.f_size, kernel_size=4, stride=2, padding=1)
             ),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.3),
             self._block(self.f_size, self.f_size * 2, 4, 2, 1),
             SelfAttention(self.f_size * 2),
+            nn.Dropout(0.3),
             self._block(self.f_size * 2, self.f_size * 4, 4, 2, 1),
+            nn.Dropout(0.3),
             self._block(self.f_size * 4, self.f_size * 8, 4, 2, 1),
+            nn.Dropout(0.3),
             spectral_norm(
                 nn.Conv2d(self.f_size * 8, 1, kernel_size=4, stride=2, padding=0)
             ),
@@ -200,7 +241,23 @@ class SaDiscriminator(SpectralDiscriminator):
         )
 
 
-class SaGenerator(SpectralGenerator):
+class SaGenerator(Generator):
+    def _block(self, in_channels, out_channels, kernel_size, stride, padding):
+        return nn.Sequential(
+            spectral_norm(
+                nn.ConvTranspose2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size,
+                    stride,
+                    padding,
+                    bias=False,
+                )
+            ),
+            nn.BatchNorm2d(out_channels),
+            nn.GELU(),
+        )
+
     def _build_network(self):
         return nn.Sequential(
             self._block(self.n_size, self.f_size * 8, 4, 1, 0),

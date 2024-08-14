@@ -1,7 +1,7 @@
 # Setup
 
 This repository contains a script for training Generative Adversarial Networks (GANs) on the CelebA dataset using PyTorch. The script allows flexibility in choosing different network architectures, configuring hyperparameters, and saving training progress. Currently, is is possible
-of training three GANs models: DCGAN, DCGAN with spectral normalization, and DCGAN with self-attention. Those models are inspired on the following paper [paper 1](https://arxiv.org/abs/1511.06434), [paper 2](https://arxiv.org/abs/1802.05957), [paper 3](https://arxiv.org/abs/1805.08318).
+of training three GANs models: DCGAN, DCGAN with spectral normalization, DCGAN with spectral normalization and dropout on discriminator and GELU activation functions in Generator, and DCGAN with self-attention. Those models are inspired on the following papers [paper 1](https://arxiv.org/abs/1511.06434), [paper 2](https://arxiv.org/abs/1802.05957), [paper 3](https://arxiv.org/abs/1805.08318).
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ The training script is `main.py`. The script accepts several command-line argume
 python main.py [-net NET] [-lr LR] [-epochs EPOCHS] [-bs BS] [-b_1 B_1] [-b_2 B_2] [-nc NC] [-nf NF] [-nz NZ] [-workers WORKERS]
 ```
 #### Arguments:
-- `-net`: The name of the GAN network architecture to use. Available options: `dcgan`, `spectral_dcgan`, `sagan`. (default: `dcgan`).
+- `-net`: The name of the GAN network architecture to use. Available options: `dcgan`, `spectral_dcgan`, `spectral_dcgan_v2`, `sagan`. (default: `dcgan`).
 - `-lr`: Learning rate for the optimizers (default: `2e-4`).
 - `-epochs`: Number of training epochs (default: `30`).
 - `-bs`: Batch size for the DataLoader (default: `64`).
@@ -51,7 +51,7 @@ python main.py [-net NET] [-lr LR] [-epochs EPOCHS] [-bs BS] [-b_1 B_1] [-b_2 B_
 - `-nz`: Size of the latent vector (default: `100`).
 - `-workers`: Number of worker threads for loading data (default: `4`).
 
-All models were trained with default parameters. To train standard DCGAN use the following command:
+All models were trained according to the following commands. To train standard DCGAN use the following command:
 ```
 python train_gan.py -net dcgan
 ```
@@ -61,9 +61,14 @@ To train DCGAN with spectral normalization on discriminator use the following co
 python train_gan.py -net spectral_dcgan
 ```
 
+To train DCGAN with spectral normalization on discriminator and additional tricks use the following command:
+```
+python train_gan.py -net spectral_dcgan_v2 -b_1 0.0
+```
+
 To train DCGAN with self-attention use the following command:
 ```
-python train_gan.py -net sagan
+python train_gan.py -net sagan -b_1 0.0
 ```
 
 The script will create the following directories:
@@ -157,5 +162,17 @@ python create_plots.py -path train_details/sagan.pth
 
 #### Discriminator outputs
 ![Discriminator outputs](plots/disc_outputs_sagan.png)
+
+
+### 9. Results for DCGAN with spectral normalization and extra tricks
+#### Generated images
+![Generated images](gifs/spectral_dcgan_v2.gif)
+
+#### Discriminator and generator losses
+![Losses](plots/losses_spectral_dcgan_v2.png)
+
+#### Discriminator outputs
+![Discriminator outputs](plots/disc_outputs_spectral_dcgan_v2.png)
+
 
 

@@ -1,4 +1,5 @@
 import argparse
+import random
 import time
 from pathlib import Path
 
@@ -18,6 +19,9 @@ PATHS = {}
 
 
 def main():
+    torch.manual_seed(0)
+    random.seed(0)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-net", type=str, default="dcgan", required=False)
     parser.add_argument("-lr", type=float, default=2e-4, required=False)
@@ -51,7 +55,6 @@ def main():
     train_details_path.mkdir(parents=True, exist_ok=True)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(device)
 
     transform = transforms.Compose(
         [
